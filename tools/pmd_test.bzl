@@ -7,8 +7,10 @@ def _impl(ctx):
         fail("Expecting a single java library")
 
     src_jar = lib.source_jars[0]
-    jar_deps = lib.full_compile_jars
-    full_compile_jars = ":".join([f.short_path for f in jar_deps.to_list()])
+    # We'd like this to be the compile-time jars only, but Bazel provides only
+    # hjar or ijar files, which screw PMD up.
+    jar_deps = lib.transitive_runtime_jars
+    full_transitive_runtime_jars = ":".join([f.short_path for f in jar_deps.to_list()])
 
     # Presumably this needs to be updated to actually run the resulting shell script.
 
@@ -19,18 +21,18 @@ def _impl(ctx):
         "-f text",
         "-R {}".format(ruleset.short_path),
         "-d {}".format(src_jar.short_path),
-        "-auxclasspath {}".format(full_compile_jars),
+        "-auxclasspath {}".format(full_transitive_runtime_jars),
     ]
     pmd_cmd = " ".join(pmd_cmd_args)
     script = [
         "#!/usr/bin/env bash",
         "set -o errexit",
-        "set -o xtrace",
+        # For debugging, add xtrace
+        # "set -o xtrace",
         pmd_cmd,
     ]
 
     script_content = "\n".join(script)
-    print(script_content)
 
     # Write the file, it is executed by 'bazel test'.
     test_file = ctx.actions.declare_file(ctx.attr.name)
